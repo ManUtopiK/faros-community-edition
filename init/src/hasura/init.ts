@@ -200,8 +200,7 @@ export class HasuraInit {
 
   static createSourceMetadata(
     tableNames: ReadonlyArray<string>,
-    foreignKeys: ReadonlyArray<ForeignKey>,
-    databaseUrl?: string
+    foreignKeys: ReadonlyArray<ForeignKey>
   ): Source {
     const rels: {
       [table: string]: {
@@ -242,9 +241,9 @@ export class HasuraInit {
       configuration: {
         connection_info: {
           use_prepared_statements: true,
-          database_url: databaseUrl || {
-                from_env: 'HASURA_GRAPHQL_DATABASE_URL',
-              },
+          database_url: {
+            from_env: 'HASURA_GRAPHQL_DATABASE_URL',
+          },
           isolation_level: 'read-committed',
           pool_settings: {
             connection_lifetime: 600,
@@ -403,7 +402,7 @@ export class HasuraInit {
     await this.updateEndpoints(queryCollectionFromResources);
   }
 
-  async trackAllTablesAndRelationships(databaseUrl?: string): Promise<void> {
+  async trackAllTablesAndRelationships(): Promise<void> {
     const allTableNames = await this.listAllTables();
     const source = await this.getDbSource();
     const foreignKeys = await this.listAllForeignKeys();
@@ -411,16 +410,11 @@ export class HasuraInit {
     const trackedTables = source.tables.filter(
       (table) => table.table.schema === 'public'
     );
+
     if (trackedTables.length === 0) {
       await this.loadMetadata({
         version: 3,
-        sources: [
-          HasuraInit.createSourceMetadata(
-            allTableNames,
-            foreignKeys,
-            databaseUrl
-          ),
-        ],
+        sources: [HasuraInit.createSourceMetadata(allTableNames, foreignKeys)],
       });
       this.logger.info('Loaded source metadata into Hasura');
       return;
@@ -486,8 +480,7 @@ export class HasuraInit {
 async function main(): Promise<void> {
   program
     .requiredOption('--hasura-url <string>')
-    .option('--admin-secret <string>')
-    .option('--database-url <string>');
+    .option('--admin-secret <string>');
 
   program.parse();
   const options = program.opts();
@@ -510,7 +503,7 @@ async function main(): Promise<void> {
     logger
   );
 
-  await hasura.trackAllTablesAndRelationships(options.databaseUrl);
+  await hasura.trackAllTablesAndRelationships();
   await hasura.createEndpoints();
 
   logger.info('Hasura setup is complete');
